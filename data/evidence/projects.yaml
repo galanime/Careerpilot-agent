@@ -1,0 +1,31 @@
+items:
+  - project: LifeHelper
+    title: AI Agent task decomposition and traceable tool execution
+    tags: [AI Agent, tool calling, planning, evaluation, trace, FastAPI]
+    details:
+      - Implemented task decomposition, tool execution, retry, trace replay, evaluation storage, and manual tool run flows.
+      - Demonstrates agent workflow design, observability, and defensive checks for generated outputs.
+  - project: short-video-studio
+    title: Provider-routed short video pipeline orchestration
+    tags: [workflow, provider routing, pipeline, prompt, evaluation, React]
+    details:
+      - Built a private/pro merchant short-video pipeline with provider routing, prompt templates, review flow, and frontend control center.
+      - Shows production-style orchestration, status tracking, and separation between public demo and private provider execution.
+  - project: short-video-studio-lite
+    title: Public-safe AI workflow demo with mock providers
+    tags: [AI workflow, mock provider, testing, FastAPI, React]
+    details:
+      - Preserved the workflow shape, backend tests, web UI, and mock export flow while excluding private provider credentials.
+      - Useful evidence for safe demo design and testable AI application boundaries.
+  - project: job-hunt-kb
+    title: ATS-aware job application knowledge base
+    tags: [RAG, retrieval, evidence, resume, keyword matching, CLI]
+    details:
+      - Maintains candidate materials, role profiles, ATS keywords, templates, generated packages, and tests.
+      - Provides structured evidence for JD analysis, resume customization, and interview preparation.
+  - project: codex-bounty-autopilot
+    title: CLI automation system with gated external actions
+    tags: [Go adjacent, automation, CLI, validation, safety, GitHub]
+    details:
+      - Uses validation scripts and explicit config gates to control external GitHub actions.
+      - Demonstrates safe automation boundaries, command orchestration, and operator-facing workflow design.
