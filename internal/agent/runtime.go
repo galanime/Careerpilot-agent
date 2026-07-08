@@ -106,8 +106,8 @@ func (r *Runtime) SubscribeEvents(ctx context.Context, runID string) <-chan Even
 }
 
 func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, error) {
-	plan := []string{"parse_jd", "search_evidence", "score_match", "generate_materials", "evaluate_output"}
-	run = r.addStep(run, domain.StepTypePlanning, "planner", map[string]any{"goal": "analyze JD and generate evidence-grounded application materials"}, map[string]any{"tools": plan}, "")
+	plan := []string{"parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan"}
+	run = r.addStep(run, domain.StepTypePlanning, "planner", map[string]any{"goal": "evaluate opportunity, avoid spam applications, and generate evidence-grounded application materials"}, map[string]any{"tools": plan}, "")
 	if err := r.saveRun(run); err != nil {
 		return run, err
 	}
@@ -152,6 +152,20 @@ func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, erro
 		return run, err
 	}
 
+	opportunityInput := tools.EvaluateOpportunityInput{CompanyName: run.Input.CompanyName, JobTitle: run.Input.JobTitle, TargetRole: run.Input.TargetRole, Analysis: analysis, Evidence: evidence, Match: match}
+	opportunityStep, rawOpportunity, err := r.executeTool(ctx, run, "evaluate_opportunity", opportunityInput)
+	run.Steps = append(run.Steps, opportunityStep)
+	if err := r.afterStep(run, opportunityStep); err != nil {
+		return run, err
+	}
+	if err != nil {
+		return run, err
+	}
+	var opportunity domain.OpportunityEvaluation
+	if err := json.Unmarshal(rawOpportunity, &opportunity); err != nil {
+		return run, err
+	}
+
 	materialsInput := tools.GenerateMaterialsInput{CompanyName: run.Input.CompanyName, JobTitle: run.Input.JobTitle, Analysis: analysis, Evidence: evidence, Match: match}
 	materialsStep, rawMaterials, err := r.executeTool(ctx, run, "generate_materials", materialsInput)
 	run.Steps = append(run.Steps, materialsStep)
@@ -179,11 +193,27 @@ func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, erro
 		return run, err
 	}
 
+	planInput := tools.BuildApplicationPlanInput{CompanyName: run.Input.CompanyName, JobTitle: run.Input.JobTitle, Analysis: analysis, Evidence: evidence, Match: match, Opportunity: opportunity, Materials: materials}
+	planStep, rawPlan, err := r.executeTool(ctx, run, "build_application_plan", planInput)
+	run.Steps = append(run.Steps, planStep)
+	if err := r.afterStep(run, planStep); err != nil {
+		return run, err
+	}
+	if err != nil {
+		return run, err
+	}
+	var applicationPlan domain.ApplicationPlan
+	if err := json.Unmarshal(rawPlan, &applicationPlan); err != nil {
+		return run, err
+	}
+
 	artifacts := []domain.Artifact{
 		r.newArtifact(run.ID, "jd_analysis", "JD 结构化分析", toPrettyJSON(analysis), nil),
 		r.newArtifact(run.ID, "match_report", "岗位匹配报告", toPrettyJSON(match), nil),
+		r.newArtifact(run.ID, "opportunity_evaluation", "机会评分与投递决策", toPrettyJSON(opportunity), map[string]any{"decision": opportunity.Decision, "score": opportunity.OverallScore}),
 		r.newArtifact(run.ID, "application_materials", "投递材料草稿", renderMaterials(materials), map[string]any{"evidence_count": len(evidence.Items)}),
 		r.newArtifact(run.ID, "eval_report", "自检评估报告", toPrettyJSON(evalReport), nil),
+		r.newArtifact(run.ID, "application_plan", "申请计划与追踪字段", toPrettyJSON(applicationPlan), map[string]any{"status": applicationPlan.Status}),
 	}
 	for _, artifact := range artifacts {
 		run.Artifacts = append(run.Artifacts, artifact)

@@ -12,18 +12,31 @@ import (
 	"careerpilot-agent/internal/api"
 	"careerpilot-agent/internal/llm"
 	"careerpilot-agent/internal/memory"
+	"careerpilot-agent/internal/opportunities"
 	"careerpilot-agent/internal/storage"
 	"careerpilot-agent/internal/tools"
 )
 
 func main() {
 	evidencePath := getenv("CAREERPILOT_EVIDENCE_PATH", "data/evidence/projects.yaml")
+	jobHuntProjectsPath := getenv("CAREERPILOT_JOB_HUNT_PROJECTS_PATH", "../job-hunt-kb/data/materials/projects.yaml")
 	addr := getenv("CAREERPILOT_ADDR", ":8788")
 	dbPath := getenv("CAREERPILOT_DB_PATH", "careerpilot.db")
+	opportunityDir := getenv("CAREERPILOT_OPPORTUNITY_DIR", "data/opportunities")
+	pipelinePath := getenv("CAREERPILOT_PIPELINE_PATH", "data/pipeline.md")
 
 	memoryStore, err := memory.LoadStore(evidencePath)
 	if err != nil {
 		log.Fatalf("load evidence store: %v", err)
+	}
+	if jobHuntProjectsPath != "" {
+		jobHuntEvidence, err := memory.LoadJobHuntProjects(jobHuntProjectsPath)
+		if err != nil {
+			log.Printf("job-hunt-kb project bridge skipped: %v", err)
+		} else {
+			memoryStore.Append(jobHuntEvidence)
+			log.Printf("loaded %d job-hunt-kb project evidence items", len(jobHuntEvidence))
+		}
 	}
 
 	runStore, err := storage.NewSQLiteStore(context.Background(), dbPath)
@@ -50,13 +63,16 @@ func main() {
 	registry.Register(&tools.ParseJDTool{})
 	registry.Register(tools.NewSearchEvidenceTool(memoryStore))
 	registry.Register(&tools.MatchScoringTool{})
+	registry.Register(&tools.EvaluateOpportunityTool{})
 	registry.Register(tools.NewGenerateMaterialsTool(provider))
 	registry.Register(&tools.EvaluateOutputTool{})
+	registry.Register(&tools.BuildApplicationPlanTool{})
 
 	runtime := agent.NewRuntime(runStore, registry)
+	opportunityStore := opportunities.NewStore(opportunityDir, pipelinePath)
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           api.NewServer(runtime).Routes(),
+		Handler:           api.NewServer(runtime, opportunityStore).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

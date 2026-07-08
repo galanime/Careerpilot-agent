@@ -41,7 +41,7 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 			t.Fatalf("step %s expected done status, got %s: %s", step.Name, step.Status, step.Error)
 		}
 	}
-	expectedSteps := []string{"planner", "parse_jd", "search_evidence", "score_match", "generate_materials", "evaluate_output"}
+	expectedSteps := []string{"planner", "parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan"}
 	if !reflect.DeepEqual(stepNames, expectedSteps) {
 		t.Fatalf("unexpected step order:\nwant %#v\n got %#v", expectedSteps, stepNames)
 	}
@@ -52,7 +52,7 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 		artifactTypes = append(artifactTypes, artifact.Type)
 		artifactsByType[artifact.Type] = artifact
 	}
-	expectedArtifacts := []string{"jd_analysis", "match_report", "application_materials", "eval_report"}
+	expectedArtifacts := []string{"jd_analysis", "match_report", "opportunity_evaluation", "application_materials", "eval_report", "application_plan"}
 	if !reflect.DeepEqual(artifactTypes, expectedArtifacts) {
 		t.Fatalf("unexpected artifact order:\nwant %#v\n got %#v", expectedArtifacts, artifactTypes)
 	}
@@ -75,6 +75,15 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 	}
 	assertContains(t, match.RecommendedUse, "LifeHelper: AI Agent task decomposition and traceable tool execution")
 
+	var opportunity domain.OpportunityEvaluation
+	decodeArtifact(t, artifactsByType["opportunity_evaluation"], &opportunity)
+	if opportunity.OverallScore < 60 {
+		t.Fatalf("expected opportunity score >= 60, got %.1f", opportunity.OverallScore)
+	}
+	if len(opportunity.ResponsibleUseNotes) == 0 {
+		t.Fatalf("expected responsible-use notes")
+	}
+
 	materials := artifactsByType["application_materials"].Content
 	assertTextContains(t, materials, "LifeHelper")
 	assertTextContains(t, materials, "Agent")
@@ -90,6 +99,12 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 	}
 	if len(evalReport.UnsupportedClaims) > 0 {
 		t.Fatalf("expected no unsupported claims, got %#v", evalReport.UnsupportedClaims)
+	}
+
+	var applicationPlan domain.ApplicationPlan
+	decodeArtifact(t, artifactsByType["application_plan"], &applicationPlan)
+	if len(applicationPlan.SubmissionGuardrail) == 0 {
+		t.Fatalf("expected submission guardrails")
 	}
 }
 
@@ -131,8 +146,10 @@ func newRuntimeWithStore(store *memory.Store) *agent.Runtime {
 	registry.Register(&tools.ParseJDTool{})
 	registry.Register(tools.NewSearchEvidenceTool(store))
 	registry.Register(&tools.MatchScoringTool{})
+	registry.Register(&tools.EvaluateOpportunityTool{})
 	registry.Register(tools.NewGenerateMaterialsTool(nil))
 	registry.Register(&tools.EvaluateOutputTool{})
+	registry.Register(&tools.BuildApplicationPlanTool{})
 	return agent.NewRuntime(storage.NewStore(), registry)
 }
 

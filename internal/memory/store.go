@@ -34,6 +34,10 @@ func NewStore(items []domain.EvidenceItem) *Store {
 	return &Store{items: items}
 }
 
+func (s *Store) Append(items []domain.EvidenceItem) {
+	s.items = append(s.items, items...)
+}
+
 func (s *Store) Search(ctx context.Context, keywords []string, limit int) domain.EvidenceSearchResult {
 	type scored struct {
 		item  domain.EvidenceItem

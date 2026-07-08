@@ -257,7 +257,8 @@ button[type="submit"] {
   gap: 10px;
 }
 
-.run-card {
+.run-card,
+.opportunity-card {
   display: grid;
   gap: 7px;
   width: 100%;
@@ -272,7 +273,43 @@ button[type="submit"] {
   background: #eff6ff;
 }
 
+.opportunity-list {
+  display: grid;
+  gap: 12px;
+  max-height: 640px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.opportunity-card {
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.opportunity-head,
+.button-row,
+.scan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.opportunity-head {
+  justify-content: space-between;
+}
+
+.button-row {
+  margin-top: 4px;
+}
+
+.scan-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .run-card small,
+.opportunity-card small,
 .artifact-header small,
 .muted {
   color: #64748b;
@@ -447,14 +484,25 @@ pre {
 }
 
 .status.done,
-.status.passed {
+.status.passed,
+.status.ready_for_review,
+.status.applied,
+.status.interview {
   color: #166534;
   background: #dcfce7;
 }
 
-.status.failed {
+.status.failed,
+.status.do_not_apply,
+.status.rejected {
   color: #991b1b;
   background: #fee2e2;
+}
+
+.status.archived,
+.status.scored {
+  color: #334155;
+  background: #e2e8f0;
 }
 
 .artifact-tabs {
@@ -535,7 +583,8 @@ pre {
   .workspace,
   .hero-metrics,
   .dashboard-grid,
-  .form-grid {
+  .form-grid,
+  .scan-summary {
     grid-template-columns: 1fr;
   }
 

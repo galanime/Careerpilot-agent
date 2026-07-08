@@ -62,8 +62,10 @@ func newTestRuntime() *agent.Runtime {
 	registry.Register(&tools.ParseJDTool{})
 	registry.Register(tools.NewSearchEvidenceTool(store))
 	registry.Register(&tools.MatchScoringTool{})
+	registry.Register(&tools.EvaluateOpportunityTool{})
 	registry.Register(tools.NewGenerateMaterialsTool(nil))
 	registry.Register(&tools.EvaluateOutputTool{})
+	registry.Register(&tools.BuildApplicationPlanTool{})
 	return agent.NewRuntime(storage.NewStore(), registry)
 }
 
@@ -81,10 +83,10 @@ func assertCompletedRun(t *testing.T, run domain.Run) {
 	if run.Status != domain.RunStatusDone {
 		t.Fatalf("expected done status, got %s", run.Status)
 	}
-	if len(run.Steps) != 6 {
-		t.Fatalf("expected 6 steps, got %d", len(run.Steps))
+	if len(run.Steps) != 8 {
+		t.Fatalf("expected 8 steps, got %d", len(run.Steps))
 	}
-	if len(run.Artifacts) != 4 {
-		t.Fatalf("expected 4 artifacts, got %d", len(run.Artifacts))
+	if len(run.Artifacts) != 6 {
+		t.Fatalf("expected 6 artifacts, got %d", len(run.Artifacts))
 	}
 }

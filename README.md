@@ -1,89 +1,43 @@
 # CareerPilot Agent
 
-CareerPilot Agent 是一个用于投递 AI Agent / 大模型应用 / 后端 AI Infra 岗位的作品集项目。它用 Go 实现一个轻量 Agent Runtime，围绕“岗位 JD 分析 → 候选人证据检索 → 匹配评分 → 简历与面试材料生成 → 自检评估”的闭环流程，展示 Agent 编排、工具调用、可观测 Trace、证据约束生成和工程化测试能力。
+CareerPilot Agent 是一个本地优先、证据驱动、人工确认的求职运营 Agent。它融合两个开源求职自动化项目的产品思想，以及本地 `job-hunt-kb` 求职知识库和现有 Go Agent Runtime，围绕“岗位导入 → 机会评分 → 候选人证据检索 → 匹配评分 → 材料生成 → 自检评估 → 申请计划 → 投递追踪”的闭环流程，展示 Agent 编排、工具调用、可观测 Trace、证据约束生成和负责任自动化能力。
 
-## 项目定位
+本项目明确不是垃圾投递器：系统不会自动提交申请、不会发送邮件、不会伪造经历；低匹配岗位会输出“不建议投递 / 先补证据”，最终投递动作必须由本人确认。
 
-这个项目不是简单的 ChatGPT 包装，而是一个可解释的 Agent 系统：
+## 四源融合
 
-- Planner 生成固定执行计划。
-- Tool Registry 约束 Agent 可调用的工具。
-- Memory Store 从本地 evidence 中检索候选人真实项目证据。
-- Evaluator 检查输出关键词覆盖和无证据风险。
-- API 暴露 Run、Step、Artifact 和 SSE Trace。
+- [AI Job Search](https://github.com/MadsLorentzen/ai-job-search)：借鉴 setup / scrape / rank / apply、drafter-reviewer、PDF/ATS 校验、cover letter 和面试准备流程。
+- [Career-Ops](https://github.com/santifer/career-ops)：借鉴 opportunity pipeline、A-G 评估、scanner / tracker、human-in-the-loop、liveness、报告和数据契约。
+- `../job-hunt-kb`：作为张恒玮本地求职知识库，提供个人资料、项目、实习、技能、岗位画像、ATS 关键词和模板。
+- `careerpilot-agent`：作为统一 Go Agent Runtime、HTTP API、SSE Trace 和后续 dashboard。
 
-适合在简历中包装为：
-
-> 基于 Go 实现证据驱动型 AI Agent Runtime，支持 JD 解析、项目证据检索、岗位匹配评分、投递材料生成和自检评估，并通过 HTTP API/SSE 输出完整执行 Trace。
-
-## 当前 MVP 能力
+## 当前能力
 
 - Go 标准库 HTTP API。
 - SQLite Run Store，持久化 runs、steps、artifacts。
+- 文件型 Opportunity Store，持久化岗位机会、状态、评分与决策。
+- `data/pipeline.md` 本地岗位收件箱。
+- 白名单岗位 scanner：支持 Greenhouse、Lever、Ashby 和 direct careers URL。
+- Liveness gate：对岗位 URL 做有效性检查，识别关闭、404、过期和信号不足。
 - 本地 YAML 风格 evidence 检索。
-- 工具链：`parse_jd`、`search_evidence`、`score_match`、`generate_materials`、`evaluate_output`。
+- `job-hunt-kb` 项目材料桥接：启动时可读取 `../job-hunt-kb/data/materials/projects.yaml` 并合并进 evidence 检索。
+- 工具链：`parse_jd`、`search_evidence`、`score_match`、`evaluate_opportunity`、`generate_materials`、`evaluate_output`、`build_application_plan`。
 - LLM Provider：Fake、Anthropic/Claude、OpenAI-compatible、Ollama。
-- 示例 JD 和候选人项目 evidence。
-- 后端单元测试。
+- 后端单元测试与 golden trace 测试。
 - React Trace UI：Run 创建表单、最近 Run 列表、Trace Timeline、Artifact Tabs、Eval Dashboard。
-- 后台异步 Run 执行，`POST /api/runs` 立即返回 `202 Accepted`。
 - 实时 SSE Trace，推送 run、step、artifact 事件。
 
 ## 快速启动
 
 环境要求：
 
-- Go 1.24+（本机已安装便携版到 `D:\Data\go-sdk\go`）
-- 可选：Node.js 20+，用于后续前端 Trace UI
+- Go 1.24+，本机便携版路径：`D:\Data\go-sdk\go`
+- 可选：Node.js 20+，用于前端 Trace UI
 
 ```powershell
-cd careerpilot-agent
-go test ./...
-go run ./cmd/server
-```
-
-前端 Trace UI：
-
-```powershell
-cd careerpilot-agent\web
-npm.cmd install
-npm.cmd run dev
-```
-
-前端默认监听：
-
-```text
-http://127.0.0.1:5174
-```
-
-可选配置：
-
-```powershell
-$env:CAREERPILOT_DB_PATH = "careerpilot.db"
-$env:CAREERPILOT_LLM_PROVIDER = "fake"       # fake | anthropic | openai | ollama
-$env:CAREERPILOT_LLM_MODEL = "claude-opus-4-7"
-$env:CAREERPILOT_LLM_API_KEY = "..."         # anthropic/openai 需要
-$env:CAREERPILOT_LLM_BASE_URL = "..."        # openai-compatible/ollama 可用
-```
-
-Provider 示例：
-
-```powershell
-# Claude / Anthropic
-$env:CAREERPILOT_LLM_PROVIDER = "anthropic"
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-$env:CAREERPILOT_LLM_MODEL = "claude-opus-4-7"
-
-# OpenAI-compatible，例如 DeepSeek/Qwen/自建网关
-$env:CAREERPILOT_LLM_PROVIDER = "openai"
-$env:CAREERPILOT_LLM_API_KEY = "..."
-$env:CAREERPILOT_LLM_BASE_URL = "https://api.openai.com/v1"
-$env:CAREERPILOT_LLM_MODEL = "gpt-4o-mini"
-
-# Ollama 本地模型
-$env:CAREERPILOT_LLM_PROVIDER = "ollama"
-$env:CAREERPILOT_LLM_BASE_URL = "http://127.0.0.1:11434"
-$env:CAREERPILOT_LLM_MODEL = "llama3.1"
+cd D:\C0dex-AIcoding\careerpilot-agent
+D:\Data\go-sdk\go\bin\go.exe test ./...
+D:\Data\go-sdk\go\bin\go.exe run ./cmd/server
 ```
 
 服务默认监听：
@@ -92,86 +46,124 @@ $env:CAREERPILOT_LLM_MODEL = "llama3.1"
 http://127.0.0.1:8788
 ```
 
+可选配置：
+
+```powershell
+$env:CAREERPILOT_DB_PATH = "careerpilot.db"
+$env:CAREERPILOT_OPPORTUNITY_DIR = "data/opportunities"
+$env:CAREERPILOT_PIPELINE_PATH = "data/pipeline.md"
+$env:CAREERPILOT_EVIDENCE_PATH = "data/evidence/projects.yaml"
+$env:CAREERPILOT_JOB_HUNT_PROJECTS_PATH = "../job-hunt-kb/data/materials/projects.yaml"
+$env:CAREERPILOT_LLM_PROVIDER = "fake"       # fake | anthropic | openai | ollama
+$env:CAREERPILOT_LLM_MODEL = "gpt-4o-mini"
+$env:CAREERPILOT_LLM_API_KEY = "..."
+$env:CAREERPILOT_LLM_BASE_URL = "..."
+```
+
+## 常用 API
+
 健康检查：
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8788/healthz
 ```
 
-创建一次 Agent Run（返回 `202 Accepted`，后台继续执行）：
+导入岗位机会：
 
 ```powershell
 $body = @{
   company_name = "ByteDance"
   job_title = "AI Agent Engineer Intern"
   target_role = "AI Agent Engineer"
-  jd_text = "负责 AI Agent 平台开发，要求 Go、RAG、Tool Calling、Evaluation、后端工程和工作流编排能力。"
+  location = "北京"
+  url = "https://example.com/jobs/agent"
+  jd_text = "负责 AI Agent 应用开发，要求 Python、Go、RAG、Tool Calling、后端工程和评估能力。"
 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8788/api/runs -Body $body -ContentType "application/json"
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8788/api/opportunities `
+  -Body $body `
+  -ContentType "application/json"
 ```
 
-## API
-
-### 创建 Run
-
-```http
-POST /api/runs
-```
-
-返回 `202 Accepted` 和初始 `created` 状态的 Run，后台 goroutine 会继续执行 Agent。
-
-### 列出 Run
-
-```http
-GET /api/runs
-```
-
-### 获取 Run 详情
-
-```http
-GET /api/runs/{run_id}
-```
-
-### 获取产物
-
-```http
-GET /api/runs/{run_id}/artifacts
-```
-
-### 获取事件流
-
-```http
-GET /api/runs/{run_id}/events
-```
-
-SSE 会先回放当前内存中的历史事件，再继续推送实时事件。当前事件类型：
-
-- `run_created`
-- `run_started`
-- `step_started`
-- `step_finished`
-- `step_failed`
-- `artifact_created`
-- `run_finished`
-- `run_failed`
-
-命令行观察：
+评估岗位：
 
 ```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8788/api/opportunities/<id>/evaluate
+```
+
+更新投递状态：
+
+```powershell
+$body = @{
+  status = "applied"
+  notes = @("已人工确认后投递")
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8788/api/opportunities/<id>/status `
+  -Body $body `
+  -ContentType "application/json"
+```
+
+扫描白名单公司岗位：
+
+```powershell
+$body = @{
+  target_role = "AI Agent Engineer"
+  title_allow = @("Agent", "AI", "LLM", "Python", "后端")
+  title_block = @("Senior", "Staff", "Principal", "博士")
+  companies = @(
+    @{
+      name = "OpenAI"
+      provider = "greenhouse"
+      slug = "openai"
+      enabled = $true
+    }
+  )
+} | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8788/api/scan `
+  -Body $body `
+  -ContentType "application/json"
+```
+
+检查岗位链接是否有效：
+
+```powershell
+$body = @{ url = "https://example.com/jobs/agent" } | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8788/api/liveness `
+  -Body $body `
+  -ContentType "application/json"
+```
+
+Run 与 Trace：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8788/api/runs
+Invoke-RestMethod http://127.0.0.1:8788/api/runs/<run_id>/artifacts
 curl.exe -N http://127.0.0.1:8788/api/runs/<run_id>/events
 ```
 
-`run_finished` 或 `run_failed` 是终止事件，服务端会结束该 SSE 响应。
+## API Surface
 
-## 前端 Trace UI
-
-前端位于 `web/`，提供一次投递材料生成 Run 的可视化控制台：
-
-- 输入公司、岗位、目标方向和 JD 文本并创建 Run。
-- 查看最近 Run 列表并回放已完成结果。
-- 通过 SSE 实时展示 Planner、工具调用和 Artifact 创建事件。
-- 展示 JD 结构化分析、岗位匹配报告、投递材料草稿和自检评估报告。
-- 用 Eval Dashboard 汇总匹配分、关键词覆盖率和无证据风险。
+- `GET /healthz`
+- `GET /api/runs`
+- `POST /api/runs`
+- `GET /api/runs/{run_id}`
+- `GET /api/runs/{run_id}/artifacts`
+- `GET /api/runs/{run_id}/events`
+- `GET /api/opportunities`
+- `POST /api/opportunities`
+- `GET /api/opportunities/{id}`
+- `POST /api/opportunities/{id}/evaluate`
+- `POST /api/opportunities/{id}/status`
+- `POST /api/scan`
+- `POST /api/liveness`
 
 ## 目录结构
 
@@ -180,21 +172,33 @@ careerpilot-agent/
   cmd/server/             # HTTP 服务入口
   internal/api/           # API 路由和 handler
   internal/agent/         # Agent Runtime 和状态执行
-  internal/domain/        # Run、Step、Artifact、Report 等领域模型
-  internal/memory/        # 本地 evidence store 与检索
+  internal/domain/        # Run、Opportunity、Artifact 等领域模型
+  internal/memory/        # 本地 evidence store、job-hunt-kb 桥接
+  internal/opportunities/ # 文件型岗位机会库、去重、状态管理
+  internal/scanner/       # 白名单 scanner 与 liveness 检查
   internal/llm/           # Fake、Claude、OpenAI-compatible、Ollama Provider
-  internal/storage/       # SQLite 持久化和内存测试实现
+  internal/storage/       # SQLite Run Store 和内存测试实现
   internal/tools/         # Tool Registry 和工具实现
   data/evidence/          # 候选人项目证据
+  data/opportunities/     # 岗位机会 JSON
+  data/pipeline.md        # 本地岗位收件箱
   examples/jds/           # 示例岗位 JD
-  docs/                   # PRD 和技术设计
+  docs/                   # PRD、技术设计、融合路线图和使用说明
   web/                    # React Trace UI
 ```
 
+## 文档
+
+- [四源融合方案](docs/FUSION_ROADMAP_ZH.md)
+- [使用说明](docs/USAGE_ZH.md)
+- [数据契约](DATA_CONTRACT_ZH.md)
+- [PRD](docs/PRD.md)
+- [技术设计](docs/TECH_DESIGN.md)
+
 ## 后续路线
 
-1. 增加 eval cases 和 golden trace tests。
-2. 增加 SQLite FTS / pgvector 语义检索。
-3. 增加结构化输出 schema，减少 LLM JSON 解析失败。
-4. 增加 Markdown / PDF 导出。
-5. 增加 Docker Compose 和部署说明。
+1. A-G 深度报告：角色摘要、CV 匹配、级别策略、薪酬需求、定制计划、面试计划、岗位真实性。
+2. Markdown / HTML / PDF 导出和 ATS 文本层校验。
+3. Cover letter、邮件草稿、开放题回答和面试故事库。
+4. 更完整 scanner provider：Workday、BambooHR、Teamtailor、RSS、自定义本地 parser。
+5. SQLite FTS / pgvector 语义检索。

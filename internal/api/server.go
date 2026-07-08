@@ -10,15 +10,27 @@ import (
 
 	"careerpilot-agent/internal/agent"
 	"careerpilot-agent/internal/domain"
+	"careerpilot-agent/internal/opportunities"
+	"careerpilot-agent/internal/scanner"
 	"careerpilot-agent/internal/storage"
 )
 
 type Server struct {
-	runtime *agent.Runtime
+	runtime       *agent.Runtime
+	opportunities *opportunities.Store
+	scanner       *scanner.Scanner
 }
 
-func NewServer(runtime *agent.Runtime) *Server {
-	return &Server{runtime: runtime}
+func NewServer(runtime *agent.Runtime, opportunityStores ...*opportunities.Store) *Server {
+	var opportunityStore *opportunities.Store
+	if len(opportunityStores) > 0 {
+		opportunityStore = opportunityStores[0]
+	}
+	var jobScanner *scanner.Scanner
+	if opportunityStore != nil {
+		jobScanner = scanner.New(opportunityStore)
+	}
+	return &Server{runtime: runtime, opportunities: opportunityStore, scanner: jobScanner}
 }
 
 func (s *Server) Routes() http.Handler {
@@ -27,6 +39,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/runs", s.handleListRuns)
 	mux.HandleFunc("POST /api/runs", s.handleCreateRun)
 	mux.HandleFunc("GET /api/runs/", s.handleRunSubresource)
+	mux.HandleFunc("GET /api/opportunities", s.handleListOpportunities)
+	mux.HandleFunc("POST /api/opportunities", s.handleCreateOpportunity)
+	mux.HandleFunc("GET /api/opportunities/", s.handleOpportunitySubresource)
+	mux.HandleFunc("POST /api/opportunities/", s.handleOpportunitySubresource)
+	mux.HandleFunc("POST /api/scan", s.handleScan)
+	mux.HandleFunc("POST /api/liveness", s.handleLiveness)
 	return withCORS(mux)
 }
 
@@ -94,6 +112,190 @@ func (s *Server) handleRunSubresource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeError(w, http.StatusNotFound, "unknown run endpoint")
+}
+
+func (s *Server) handleListOpportunities(w http.ResponseWriter, r *http.Request) {
+	if s.opportunities == nil {
+		writeError(w, http.StatusServiceUnavailable, "opportunity store is not configured")
+		return
+	}
+	items, err := s.opportunities.List()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"opportunities": items})
+}
+
+func (s *Server) handleCreateOpportunity(w http.ResponseWriter, r *http.Request) {
+	if s.opportunities == nil {
+		writeError(w, http.StatusServiceUnavailable, "opportunity store is not configured")
+		return
+	}
+	var input domain.OpportunityInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	opportunity, err := s.opportunities.Add(input)
+	if err != nil {
+		if errors.Is(err, opportunities.ErrDuplicateOpportunity) {
+			writeJSON(w, http.StatusConflict, map[string]any{"opportunity": opportunity, "error": "duplicate opportunity"})
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, opportunity)
+}
+
+func (s *Server) handleOpportunitySubresource(w http.ResponseWriter, r *http.Request) {
+	if s.opportunities == nil {
+		writeError(w, http.StatusServiceUnavailable, "opportunity store is not configured")
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/api/opportunities/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusNotFound, "opportunity id is required")
+		return
+	}
+
+	opportunity, err := s.opportunities.Get(parts[0])
+	if err != nil {
+		if errors.Is(err, opportunities.ErrOpportunityNotFound) {
+			writeError(w, http.StatusNotFound, "opportunity not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if len(parts) == 1 && r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, opportunity)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "evaluate" && r.Method == http.MethodPost {
+		s.handleEvaluateOpportunity(w, r, opportunity)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "status" && r.Method == http.MethodPost {
+		s.handleUpdateOpportunityStatus(w, r, opportunity)
+		return
+	}
+	writeError(w, http.StatusNotFound, "unknown opportunity endpoint")
+}
+
+func (s *Server) handleEvaluateOpportunity(w http.ResponseWriter, r *http.Request, opportunity domain.Opportunity) {
+	run, err := s.runtime.ExecuteRun(r.Context(), domain.RunInput{
+		CompanyName:   opportunity.CompanyName,
+		JobTitle:      opportunity.JobTitle,
+		TargetRole:    opportunity.TargetRole,
+		JDText:        opportunity.JDText,
+		OpportunityID: opportunity.ID,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"run": run, "error": err.Error()})
+		return
+	}
+	score, decision := extractOpportunityDecision(run)
+	if _, err := s.opportunities.MarkScored(opportunity.ID, score, decision, run.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"run": run, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+type updateOpportunityStatusRequest struct {
+	Status domain.OpportunityStatus `json:"status"`
+	Notes  []string                 `json:"notes,omitempty"`
+}
+
+func (s *Server) handleUpdateOpportunityStatus(w http.ResponseWriter, r *http.Request, opportunity domain.Opportunity) {
+	var input updateOpportunityStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if !validOpportunityStatus(input.Status) {
+		writeError(w, http.StatusBadRequest, "invalid opportunity status")
+		return
+	}
+	updated, err := s.opportunities.UpdateStatus(opportunity.ID, input.Status, input.Notes)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
+	if s.scanner == nil {
+		writeError(w, http.StatusServiceUnavailable, "scanner is not configured")
+		return
+	}
+	var input domain.ScanRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if len(input.Companies) == 0 {
+		writeError(w, http.StatusBadRequest, "companies is required")
+		return
+	}
+	result := s.scanner.Scan(r.Context(), input)
+	writeJSON(w, http.StatusOK, result)
+}
+
+type livenessRequest struct {
+	URL string `json:"url"`
+}
+
+func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
+	if s.scanner == nil {
+		writeError(w, http.StatusServiceUnavailable, "scanner is not configured")
+		return
+	}
+	var input livenessRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(input.URL) == "" {
+		writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.scanner.CheckLiveness(r.Context(), input.URL))
+}
+
+func validOpportunityStatus(status domain.OpportunityStatus) bool {
+	switch status {
+	case domain.OpportunityStatusNew,
+		domain.OpportunityStatusScored,
+		domain.OpportunityStatusReview,
+		domain.OpportunityStatusApplied,
+		domain.OpportunityStatusInterview,
+		domain.OpportunityStatusRejected,
+		domain.OpportunityStatusArchived,
+		domain.OpportunityStatusDoNotApply:
+		return true
+	default:
+		return false
+	}
+}
+
+func extractOpportunityDecision(run domain.Run) (float64, string) {
+	for _, artifact := range run.Artifacts {
+		if artifact.Type != "opportunity_evaluation" {
+			continue
+		}
+		var evaluation domain.OpportunityEvaluation
+		if err := json.Unmarshal([]byte(artifact.Content), &evaluation); err != nil {
+			return 0, ""
+		}
+		return evaluation.OverallScore, string(evaluation.Decision)
+	}
+	return 0, ""
 }
 
 func (s *Server) writeEventStream(w http.ResponseWriter, r *http.Request, runID string) {

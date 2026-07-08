@@ -10,8 +10,10 @@ const stepPlan = [
   { name: 'parse_jd', label: 'Parse JD', detail: '抽取职责、技能和关键词' },
   { name: 'search_evidence', label: 'Search Evidence', detail: '检索候选人真实项目证据' },
   { name: 'score_match', label: 'Score Match', detail: '计算岗位匹配度和短板' },
+  { name: 'evaluate_opportunity', label: 'Evaluate Opportunity', detail: '机会评分与反垃圾投递决策' },
   { name: 'generate_materials', label: 'Generate Materials', detail: '生成简历 bullet 与面试材料' },
   { name: 'evaluate_output', label: 'Evaluate Output', detail: '检查覆盖率与无证据风险' },
+  { name: 'build_application_plan', label: 'Application Plan', detail: '生成申请计划、追踪字段和面试卡片' },
 ];
 
 const eventTypes = [
@@ -34,6 +36,7 @@ type RunInput = {
   job_title: string;
   target_role: string;
   jd_text: string;
+  opportunity_id?: string;
 };
 
 type Run = {
@@ -95,6 +98,61 @@ type MatchReport = {
   recommended_use: string[];
 };
 
+type OpportunityStatus =
+  | 'new'
+  | 'scored'
+  | 'ready_for_review'
+  | 'applied'
+  | 'interview'
+  | 'rejected'
+  | 'archived'
+  | 'do_not_apply';
+
+type Opportunity = {
+  id: string;
+  company_name: string;
+  job_title: string;
+  target_role: string;
+  location?: string;
+  url?: string;
+  jd_text: string;
+  source: string;
+  status: OpportunityStatus;
+  score?: number;
+  decision?: string;
+  report_run_id?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type OpportunityInput = {
+  company_name: string;
+  job_title: string;
+  target_role: string;
+  location: string;
+  url: string;
+  jd_text: string;
+};
+
+type LivenessReport = {
+  url: string;
+  status: 'active' | 'closed' | 'unknown' | 'error';
+  http_status?: number;
+  final_url?: string;
+  signals: string[];
+  error?: string;
+  checked_at: string;
+};
+
+type ScanResult = {
+  found: number;
+  added: number;
+  duplicates: number;
+  filtered: number;
+  closed: number;
+  errors: string[];
+};
+
 const sampleInput: RunInput = {
   company_name: 'ByteDance',
   job_title: 'AI Agent Engineer Intern',
@@ -103,8 +161,41 @@ const sampleInput: RunInput = {
     '负责 AI Agent 平台开发，要求 Go、RAG、Tool Calling、Evaluation、后端工程、工作流编排和可观测能力。需要能设计 Agent Runtime、接入大模型 Provider，并保证输出可评测、可追踪。',
 };
 
+const sampleOpportunity: OpportunityInput = {
+  company_name: 'ByteDance',
+  job_title: 'AI Agent Engineer Intern',
+  target_role: 'AI Agent Engineer',
+  location: '北京',
+  url: 'https://example.com/jobs/agent-intern',
+  jd_text: '负责 AI Agent 应用开发，要求 Python、Go、RAG、Tool Calling、后端工程、评估与可观测能力。',
+};
+
+const sampleScanConfig = JSON.stringify(
+  {
+    target_role: 'AI Agent Engineer',
+    title_allow: ['Agent', 'AI', 'LLM', 'Python', '后端'],
+    title_block: ['Senior', 'Staff', 'Principal', '博士'],
+    companies: [
+      {
+        name: 'OpenAI',
+        provider: 'greenhouse',
+        slug: 'openai',
+        enabled: true,
+      },
+    ],
+  },
+  null,
+  2,
+);
+
 function App() {
   const [form, setForm] = useState<RunInput>(sampleInput);
+  const [opportunityForm, setOpportunityForm] = useState<OpportunityInput>(sampleOpportunity);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [scanConfig, setScanConfig] = useState(sampleScanConfig);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [livenessURL, setLivenessURL] = useState('');
+  const [livenessReport, setLivenessReport] = useState<LivenessReport | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -131,6 +222,7 @@ function App() {
 
   useEffect(() => {
     void refreshRuns();
+    void refreshOpportunities();
   }, []);
 
   useEffect(() => {
@@ -195,6 +287,111 @@ function App() {
     setRuns((payload.runs ?? []).map(normalizeRun));
   }
 
+  async function refreshOpportunities() {
+    const response = await fetch(`${API_BASE}/api/opportunities`);
+    if (!response.ok) {
+      return;
+    }
+    const payload = (await response.json()) as { opportunities?: Opportunity[] | null };
+    setOpportunities(payload.opportunities ?? []);
+  }
+
+  async function handleCreateOpportunity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/api/opportunities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(opportunityForm),
+      });
+      if (!response.ok && response.status !== 409) {
+        throw new Error(await readAPIError(response));
+      }
+      const payload = (await response.json()) as Opportunity | { opportunity?: Opportunity; error?: string };
+      const next = 'opportunity' in payload && payload.opportunity ? payload.opportunity : (payload as Opportunity);
+      setOpportunityForm({ ...sampleOpportunity, company_name: next.company_name, job_title: next.job_title });
+      await refreshOpportunities();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '导入岗位失败');
+    }
+  }
+
+  async function evaluateOpportunity(opportunity: Opportunity) {
+    setError('');
+    setEvents([]);
+    try {
+      const response = await fetch(`${API_BASE}/api/opportunities/${opportunity.id}/evaluate`, { method: 'POST' });
+      if (!response.ok) {
+        throw new Error(await readAPIError(response));
+      }
+      const payload = (await response.json()) as Run;
+      setRun(normalizeRun(payload));
+      await refreshOpportunities();
+      await refreshRuns();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '评估岗位失败');
+    }
+  }
+
+  async function updateOpportunityStatus(opportunity: Opportunity, status: OpportunityStatus) {
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/api/opportunities/${opportunity.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, notes: [`dashboard_status=${status}`] }),
+      });
+      if (!response.ok) {
+        throw new Error(await readAPIError(response));
+      }
+      await refreshOpportunities();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '更新状态失败');
+    }
+  }
+
+  async function handleScan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setScanResult(null);
+    try {
+      const parsed = JSON.parse(scanConfig) as unknown;
+      const response = await fetch(`${API_BASE}/api/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed),
+      });
+      if (!response.ok) {
+        throw new Error(await readAPIError(response));
+      }
+      const payload = (await response.json()) as ScanResult;
+      setScanResult(payload);
+      await refreshOpportunities();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '扫描失败，请检查 JSON 配置');
+    }
+  }
+
+  async function handleLiveness(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setLivenessReport(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/liveness`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: livenessURL }),
+      });
+      if (!response.ok) {
+        throw new Error(await readAPIError(response));
+      }
+      setLivenessReport((await response.json()) as LivenessReport);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Liveness 检查失败');
+    }
+  }
+
   async function loadRun(runID: string, options?: { silent?: boolean }) {
     try {
       const response = await fetch(`${API_BASE}/api/runs/${runID}`);
@@ -250,10 +447,142 @@ function App() {
         </p>
         <div className="hero-metrics">
           <Metric label="Runtime" value="Go" />
-          <Metric label="Tools" value="5" />
+          <Metric label="Tools" value="7" />
           <Metric label="Trace" value="SSE" />
-          <Metric label="Store" value="SQLite" />
+          <Metric label="Pipeline" value="Local" />
         </div>
+      </section>
+
+      <section className="workspace">
+        <form className="panel form-panel" onSubmit={handleCreateOpportunity}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow dark">Opportunities</p>
+              <h2>岗位导入</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => setOpportunityForm(sampleOpportunity)}>
+              填入示例
+            </button>
+          </div>
+          <div className="form-grid">
+            <label>
+              公司
+              <input value={opportunityForm.company_name} onChange={(event) => setOpportunityField('company_name', event.target.value, setOpportunityForm)} />
+            </label>
+            <label>
+              岗位
+              <input value={opportunityForm.job_title} onChange={(event) => setOpportunityField('job_title', event.target.value, setOpportunityForm)} />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label>
+              方向
+              <input value={opportunityForm.target_role} onChange={(event) => setOpportunityField('target_role', event.target.value, setOpportunityForm)} />
+            </label>
+            <label>
+              地点
+              <input value={opportunityForm.location} onChange={(event) => setOpportunityField('location', event.target.value, setOpportunityForm)} />
+            </label>
+          </div>
+          <label>
+            URL
+            <input value={opportunityForm.url} onChange={(event) => setOpportunityField('url', event.target.value, setOpportunityForm)} />
+          </label>
+          <label>
+            JD 文本
+            <textarea value={opportunityForm.jd_text} onChange={(event) => setOpportunityField('jd_text', event.target.value, setOpportunityForm)} rows={7} />
+          </label>
+          <button type="submit">加入 Pipeline</button>
+        </form>
+
+        <aside className="panel runs-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow dark">Pipeline</p>
+              <h2>机会列表</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => void refreshOpportunities()}>
+              刷新
+            </button>
+          </div>
+          {opportunities.length === 0 ? (
+            <p className="muted">导入或扫描岗位后会显示在这里。</p>
+          ) : (
+            <div className="opportunity-list">
+              {opportunities.slice(0, 10).map((item) => (
+                <article key={item.id} className="opportunity-card">
+                  <div className="opportunity-head">
+                    <span className={`status ${item.status}`}>{opportunityStatusText(item.status)}</span>
+                    {item.score ? <code>{item.score.toFixed(1)}</code> : null}
+                  </div>
+                  <strong>{item.company_name} · {item.job_title}</strong>
+                  <small>{item.location || '地点未填'} · {item.decision || '未评估'}</small>
+                  <div className="button-row">
+                    <button type="button" className="ghost-button" onClick={() => void evaluateOpportunity(item)}>
+                      评估
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => void updateOpportunityStatus(item, 'applied')}>
+                      已投
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => void updateOpportunityStatus(item, 'archived')}>
+                      归档
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </aside>
+      </section>
+
+      <section className="workspace">
+        <form className="panel form-panel" onSubmit={handleScan}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow dark">Scanner</p>
+              <h2>白名单扫描</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => setScanConfig(sampleScanConfig)}>
+              示例配置
+            </button>
+          </div>
+          <label>
+            Scan JSON
+            <textarea value={scanConfig} onChange={(event) => setScanConfig(event.target.value)} rows={11} />
+          </label>
+          <button type="submit">开始扫描</button>
+          {scanResult && (
+            <div className="scan-summary">
+              <Metric label="Found" value={String(scanResult.found)} />
+              <Metric label="Added" value={String(scanResult.added)} />
+              <Metric label="Dup" value={String(scanResult.duplicates)} />
+              <Metric label="Closed" value={String(scanResult.closed)} />
+            </div>
+          )}
+        </form>
+
+        <form className="panel form-panel" onSubmit={handleLiveness}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow dark">Liveness</p>
+              <h2>岗位有效性</h2>
+            </div>
+          </div>
+          <label>
+            岗位 URL
+            <input value={livenessURL} onChange={(event) => setLivenessURL(event.target.value)} placeholder="https://..." />
+          </label>
+          <button type="submit">检查链接</button>
+          {livenessReport && (
+            <article className="artifact-card">
+              <div className="artifact-header">
+                <strong>{livenessStatusText(livenessReport.status)}</strong>
+                <code>{livenessReport.http_status ?? '--'}</code>
+              </div>
+              <pre>{JSON.stringify(livenessReport, null, 2)}</pre>
+            </article>
+          )}
+        </form>
       </section>
 
       <section className="workspace">
@@ -461,6 +790,10 @@ function setFormField(key: keyof RunInput, value: string, setForm: Dispatch<SetS
   setForm((current) => ({ ...current, [key]: value }));
 }
 
+function setOpportunityField(key: keyof OpportunityInput, value: string, setForm: Dispatch<SetStateAction<OpportunityInput>>) {
+  setForm((current) => ({ ...current, [key]: value }));
+}
+
 function normalizeRun(run: Run): Run {
   return {
     ...run,
@@ -527,6 +860,30 @@ function statusText(status: RunStatus | StepStatus): string {
     pending: '等待中',
   };
   return labels[status] ?? status;
+}
+
+function opportunityStatusText(status: OpportunityStatus): string {
+  const labels: Record<OpportunityStatus, string> = {
+    new: '新机会',
+    scored: '已评分',
+    ready_for_review: '待复核',
+    applied: '已投递',
+    interview: '面试中',
+    rejected: '未通过',
+    archived: '已归档',
+    do_not_apply: '不建议投',
+  };
+  return labels[status] ?? status;
+}
+
+function livenessStatusText(status: LivenessReport['status']): string {
+  const labels: Record<LivenessReport['status'], string> = {
+    active: '岗位有效',
+    closed: '岗位关闭',
+    unknown: '信号不足',
+    error: '检查失败',
+  };
+  return labels[status];
 }
 
 function streamText(state: StreamState): string {

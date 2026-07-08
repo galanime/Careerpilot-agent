@@ -10,3 +10,9 @@ coverage.out
 web/node_modules/
 web/dist/
 web/careerpilot-verify.png
+data/opportunities/
+data/pipeline.md
+data/scan-history.tsv
+reports/
+output/
+interview-prep/
