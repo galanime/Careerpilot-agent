@@ -106,7 +106,7 @@ func (r *Runtime) SubscribeEvents(ctx context.Context, runID string) <-chan Even
 }
 
 func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, error) {
-	plan := []string{"parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan"}
+	plan := []string{"parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan", "build_dossier"}
 	run = r.addStep(run, domain.StepTypePlanning, "planner", map[string]any{"goal": "evaluate opportunity, avoid spam applications, and generate evidence-grounded application materials"}, map[string]any{"tools": plan}, "")
 	if err := r.saveRun(run); err != nil {
 		return run, err
@@ -207,6 +207,20 @@ func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, erro
 		return run, err
 	}
 
+	dossierInput := tools.BuildDossierInput{CompanyName: run.Input.CompanyName, JobTitle: run.Input.JobTitle, TargetRole: run.Input.TargetRole, Analysis: analysis, Evidence: evidence, Match: match, Opportunity: opportunity, Materials: materials, Eval: evalReport, Plan: applicationPlan, GeneratedAt: r.now()}
+	dossierStep, rawDossier, err := r.executeTool(ctx, run, "build_dossier", dossierInput)
+	run.Steps = append(run.Steps, dossierStep)
+	if err := r.afterStep(run, dossierStep); err != nil {
+		return run, err
+	}
+	if err != nil {
+		return run, err
+	}
+	var dossier domain.ApplicationDossier
+	if err := json.Unmarshal(rawDossier, &dossier); err != nil {
+		return run, err
+	}
+
 	artifacts := []domain.Artifact{
 		r.newArtifact(run.ID, "jd_analysis", "JD 结构化分析", toPrettyJSON(analysis), nil),
 		r.newArtifact(run.ID, "match_report", "岗位匹配报告", toPrettyJSON(match), nil),
@@ -214,6 +228,10 @@ func (r *Runtime) execute(ctx context.Context, run domain.Run) (domain.Run, erro
 		r.newArtifact(run.ID, "application_materials", "投递材料草稿", renderMaterials(materials), map[string]any{"evidence_count": len(evidence.Items)}),
 		r.newArtifact(run.ID, "eval_report", "自检评估报告", toPrettyJSON(evalReport), nil),
 		r.newArtifact(run.ID, "application_plan", "申请计划与追踪字段", toPrettyJSON(applicationPlan), map[string]any{"status": applicationPlan.Status}),
+		r.newArtifact(run.ID, "ag_report", "A-G 深度评估报告", dossier.ReportMarkdown, map[string]any{"format": "markdown"}),
+		r.newArtifact(run.ID, "cover_letter_draft", "Cover Letter 草稿", dossier.CoverLetterDraft, map[string]any{"format": "markdown"}),
+		r.newArtifact(run.ID, "email_draft", "申请邮件草稿", dossier.EmailDraft, map[string]any{"format": "markdown"}),
+		r.newArtifact(run.ID, "ats_checklist", "ATS / PDF 检查清单", renderList("ATS / PDF 检查清单", dossier.ATSChecklist), map[string]any{"format": "markdown"}),
 	}
 	for _, artifact := range artifacts {
 		run.Artifacts = append(run.Artifacts, artifact)
@@ -319,6 +337,14 @@ func renderMaterials(materials domain.GeneratedMaterials) string {
 	out += "\n## 自我介绍\n" + materials.Pitch + "\n\n## 面试问答\n"
 	for _, qa := range materials.InterviewQA {
 		out += "- " + qa + "\n"
+	}
+	return out
+}
+
+func renderList(title string, items []string) string {
+	out := "## " + title + "\n"
+	for _, item := range items {
+		out += "- " + item + "\n"
 	}
 	return out
 }

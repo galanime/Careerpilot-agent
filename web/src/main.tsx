@@ -153,6 +153,15 @@ type ScanResult = {
   errors: string[];
 };
 
+type EvaluateOpportunityResponse = {
+  run: Run;
+  report?: {
+    report_path: string;
+    application_path: string;
+    application_row: string;
+  } | null;
+};
+
 const sampleInput: RunInput = {
   company_name: 'ByteDance',
   job_title: 'AI Agent Engineer Intern',
@@ -325,8 +334,9 @@ function App() {
       if (!response.ok) {
         throw new Error(await readAPIError(response));
       }
-      const payload = (await response.json()) as Run;
-      setRun(normalizeRun(payload));
+      const payload = (await response.json()) as EvaluateOpportunityResponse | Run;
+      const nextRun = 'run' in payload ? payload.run : payload;
+      setRun(normalizeRun(nextRun));
       await refreshOpportunities();
       await refreshRuns();
     } catch (caught) {

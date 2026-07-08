@@ -12,7 +12,8 @@ web/dist/
 web/careerpilot-verify.png
 data/opportunities/
 data/pipeline.md
+data/applications.md
 data/scan-history.tsv
-reports/
-output/
-interview-prep/
+/reports/
+/output/
+/interview-prep/

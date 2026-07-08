@@ -66,6 +66,7 @@ func newTestRuntime() *agent.Runtime {
 	registry.Register(tools.NewGenerateMaterialsTool(nil))
 	registry.Register(&tools.EvaluateOutputTool{})
 	registry.Register(&tools.BuildApplicationPlanTool{})
+	registry.Register(&tools.BuildDossierTool{})
 	return agent.NewRuntime(storage.NewStore(), registry)
 }
 
@@ -83,10 +84,10 @@ func assertCompletedRun(t *testing.T, run domain.Run) {
 	if run.Status != domain.RunStatusDone {
 		t.Fatalf("expected done status, got %s", run.Status)
 	}
-	if len(run.Steps) != 8 {
-		t.Fatalf("expected 8 steps, got %d", len(run.Steps))
+	if len(run.Steps) != 9 {
+		t.Fatalf("expected 9 steps, got %d", len(run.Steps))
 	}
-	if len(run.Artifacts) != 6 {
-		t.Fatalf("expected 6 artifacts, got %d", len(run.Artifacts))
+	if len(run.Artifacts) != 10 {
+		t.Fatalf("expected 10 artifacts, got %d", len(run.Artifacts))
 	}
 }

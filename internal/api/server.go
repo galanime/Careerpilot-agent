@@ -11,6 +11,7 @@ import (
 	"careerpilot-agent/internal/agent"
 	"careerpilot-agent/internal/domain"
 	"careerpilot-agent/internal/opportunities"
+	"careerpilot-agent/internal/reports"
 	"careerpilot-agent/internal/scanner"
 	"careerpilot-agent/internal/storage"
 )
@@ -19,6 +20,7 @@ type Server struct {
 	runtime       *agent.Runtime
 	opportunities *opportunities.Store
 	scanner       *scanner.Scanner
+	reports       *reports.Store
 }
 
 func NewServer(runtime *agent.Runtime, opportunityStores ...*opportunities.Store) *Server {
@@ -31,6 +33,11 @@ func NewServer(runtime *agent.Runtime, opportunityStores ...*opportunities.Store
 		jobScanner = scanner.New(opportunityStore)
 	}
 	return &Server{runtime: runtime, opportunities: opportunityStore, scanner: jobScanner}
+}
+
+func (s *Server) WithReportStore(reportStore *reports.Store) *Server {
+	s.reports = reportStore
+	return s
 }
 
 func (s *Server) Routes() http.Handler {
@@ -199,11 +206,21 @@ func (s *Server) handleEvaluateOpportunity(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	score, decision := extractOpportunityDecision(run)
-	if _, err := s.opportunities.MarkScored(opportunity.ID, score, decision, run.ID); err != nil {
+	updated, err := s.opportunities.MarkScored(opportunity.ID, score, decision, run.ID)
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"run": run, "error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, run)
+	var saved *reports.SavedReport
+	if s.reports != nil {
+		report, err := s.reports.SaveRunReport(run, updated)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"run": run, "error": err.Error()})
+			return
+		}
+		saved = &report
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"run": run, "report": saved})
 }
 
 type updateOpportunityStatusRequest struct {

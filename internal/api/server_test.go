@@ -16,6 +16,7 @@ import (
 	"careerpilot-agent/internal/domain"
 	"careerpilot-agent/internal/memory"
 	"careerpilot-agent/internal/opportunities"
+	"careerpilot-agent/internal/reports"
 	"careerpilot-agent/internal/storage"
 	"careerpilot-agent/internal/tools"
 )
@@ -74,7 +75,8 @@ func TestOpportunityCanBeCreatedAndEvaluated(t *testing.T) {
 	runtime := newRuntime()
 	dir := t.TempDir()
 	opportunityStore := opportunities.NewStore(filepath.Join(dir, "opportunities"), filepath.Join(dir, "pipeline.md"))
-	server := httptest.NewServer(api.NewServer(runtime, opportunityStore).Routes())
+	reportStore := reports.NewStore(filepath.Join(dir, "reports"), filepath.Join(dir, "applications.md"))
+	server := httptest.NewServer(api.NewServer(runtime, opportunityStore).WithReportStore(reportStore).Routes())
 	defer server.Close()
 
 	body := []byte(`{"company_name":"DemoCorp","job_title":"AI Agent Engineer Intern","target_role":"AI Agent Engineer","location":"北京","url":"https://example.com/jobs/agent","jd_text":"北京实习岗位，负责 AI Agent 平台开发，要求 Go、RAG、Tool Calling、Evaluation 和后端工程能力。"}`)
@@ -110,6 +112,13 @@ func TestOpportunityCanBeCreatedAndEvaluated(t *testing.T) {
 	}
 	if loaded.ReportRunID == "" || loaded.Decision == "" {
 		t.Fatalf("expected opportunity to be marked scored, got %#v", loaded)
+	}
+	reportFiles, err := filepath.Glob(filepath.Join(dir, "reports", "*.md"))
+	if err != nil {
+		t.Fatalf("glob reports: %v", err)
+	}
+	if len(reportFiles) != 1 {
+		t.Fatalf("expected one report file, got %#v", reportFiles)
 	}
 }
 
@@ -188,5 +197,6 @@ func newRuntime() *agent.Runtime {
 	registry.Register(tools.NewGenerateMaterialsTool(nil))
 	registry.Register(&tools.EvaluateOutputTool{})
 	registry.Register(&tools.BuildApplicationPlanTool{})
+	registry.Register(&tools.BuildDossierTool{})
 	return agent.NewRuntime(storage.NewStore(), registry)
 }

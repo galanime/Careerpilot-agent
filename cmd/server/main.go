@@ -13,6 +13,7 @@ import (
 	"careerpilot-agent/internal/llm"
 	"careerpilot-agent/internal/memory"
 	"careerpilot-agent/internal/opportunities"
+	"careerpilot-agent/internal/reports"
 	"careerpilot-agent/internal/storage"
 	"careerpilot-agent/internal/tools"
 )
@@ -24,6 +25,8 @@ func main() {
 	dbPath := getenv("CAREERPILOT_DB_PATH", "careerpilot.db")
 	opportunityDir := getenv("CAREERPILOT_OPPORTUNITY_DIR", "data/opportunities")
 	pipelinePath := getenv("CAREERPILOT_PIPELINE_PATH", "data/pipeline.md")
+	reportsDir := getenv("CAREERPILOT_REPORTS_DIR", "reports")
+	applicationsPath := getenv("CAREERPILOT_APPLICATIONS_PATH", "data/applications.md")
 
 	memoryStore, err := memory.LoadStore(evidencePath)
 	if err != nil {
@@ -67,12 +70,14 @@ func main() {
 	registry.Register(tools.NewGenerateMaterialsTool(provider))
 	registry.Register(&tools.EvaluateOutputTool{})
 	registry.Register(&tools.BuildApplicationPlanTool{})
+	registry.Register(&tools.BuildDossierTool{})
 
 	runtime := agent.NewRuntime(runStore, registry)
 	opportunityStore := opportunities.NewStore(opportunityDir, pipelinePath)
+	reportStore := reports.NewStore(reportsDir, applicationsPath)
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           api.NewServer(runtime, opportunityStore).Routes(),
+		Handler:           api.NewServer(runtime, opportunityStore).WithReportStore(reportStore).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

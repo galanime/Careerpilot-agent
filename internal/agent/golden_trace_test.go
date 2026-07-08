@@ -41,7 +41,7 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 			t.Fatalf("step %s expected done status, got %s: %s", step.Name, step.Status, step.Error)
 		}
 	}
-	expectedSteps := []string{"planner", "parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan"}
+	expectedSteps := []string{"planner", "parse_jd", "search_evidence", "score_match", "evaluate_opportunity", "generate_materials", "evaluate_output", "build_application_plan", "build_dossier"}
 	if !reflect.DeepEqual(stepNames, expectedSteps) {
 		t.Fatalf("unexpected step order:\nwant %#v\n got %#v", expectedSteps, stepNames)
 	}
@@ -52,7 +52,7 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 		artifactTypes = append(artifactTypes, artifact.Type)
 		artifactsByType[artifact.Type] = artifact
 	}
-	expectedArtifacts := []string{"jd_analysis", "match_report", "opportunity_evaluation", "application_materials", "eval_report", "application_plan"}
+	expectedArtifacts := []string{"jd_analysis", "match_report", "opportunity_evaluation", "application_materials", "eval_report", "application_plan", "ag_report", "cover_letter_draft", "email_draft", "ats_checklist"}
 	if !reflect.DeepEqual(artifactTypes, expectedArtifacts) {
 		t.Fatalf("unexpected artifact order:\nwant %#v\n got %#v", expectedArtifacts, artifactTypes)
 	}
@@ -106,6 +106,9 @@ func TestGoldenTraceForExampleJD(t *testing.T) {
 	if len(applicationPlan.SubmissionGuardrail) == 0 {
 		t.Fatalf("expected submission guardrails")
 	}
+	assertTextContains(t, artifactsByType["ag_report"].Content, "## A) Role Summary")
+	assertTextContains(t, artifactsByType["cover_letter_draft"].Content, "尊敬的")
+	assertTextContains(t, artifactsByType["email_draft"].Content, "主题")
 }
 
 func TestEvalFlagsMissingEvidence(t *testing.T) {
@@ -150,6 +153,7 @@ func newRuntimeWithStore(store *memory.Store) *agent.Runtime {
 	registry.Register(tools.NewGenerateMaterialsTool(nil))
 	registry.Register(&tools.EvaluateOutputTool{})
 	registry.Register(&tools.BuildApplicationPlanTool{})
+	registry.Register(&tools.BuildDossierTool{})
 	return agent.NewRuntime(storage.NewStore(), registry)
 }
 

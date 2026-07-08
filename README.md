@@ -19,6 +19,8 @@ CareerPilot Agent 是一个本地优先、证据驱动、人工确认的求职�
 - `data/pipeline.md` 本地岗位收件箱。
 - 白名单岗位 scanner：支持 Greenhouse、Lever、Ashby 和 direct careers URL。
 - Liveness gate：对岗位 URL 做有效性检查，识别关闭、404、过期和信号不足。
+- A-G 深度评估报告、cover letter 草稿、申请邮件草稿和 ATS/PDF 检查清单。
+- 从 opportunity 发起评估时自动写入 `reports/` 与 `data/applications.md`。
 - 本地 YAML 风格 evidence 检索。
 - `job-hunt-kb` 项目材料桥接：启动时可读取 `../job-hunt-kb/data/materials/projects.yaml` 并合并进 evidence 检索。
 - 工具链：`parse_jd`、`search_evidence`、`score_match`、`evaluate_opportunity`、`generate_materials`、`evaluate_output`、`build_application_plan`。
@@ -52,6 +54,8 @@ http://127.0.0.1:8788
 $env:CAREERPILOT_DB_PATH = "careerpilot.db"
 $env:CAREERPILOT_OPPORTUNITY_DIR = "data/opportunities"
 $env:CAREERPILOT_PIPELINE_PATH = "data/pipeline.md"
+$env:CAREERPILOT_REPORTS_DIR = "reports"
+$env:CAREERPILOT_APPLICATIONS_PATH = "data/applications.md"
 $env:CAREERPILOT_EVIDENCE_PATH = "data/evidence/projects.yaml"
 $env:CAREERPILOT_JOB_HUNT_PROJECTS_PATH = "../job-hunt-kb/data/materials/projects.yaml"
 $env:CAREERPILOT_LLM_PROVIDER = "fake"       # fake | anthropic | openai | ollama
@@ -92,6 +96,11 @@ Invoke-RestMethod -Method Post `
 Invoke-RestMethod -Method Post `
   -Uri http://127.0.0.1:8788/api/opportunities/<id>/evaluate
 ```
+
+从 opportunity 发起评估会额外落盘：
+
+- `reports/*.md`：A-G 深度评估报告。
+- `data/applications.md`：本地投递 tracker。
 
 更新投递状态：
 
@@ -182,6 +191,8 @@ careerpilot-agent/
   data/evidence/          # 候选人项目证据
   data/opportunities/     # 岗位机会 JSON
   data/pipeline.md        # 本地岗位收件箱
+  data/applications.md    # 本地投递 tracker，gitignored
+  reports/                # A-G 评估报告，gitignored
   examples/jds/           # 示例岗位 JD
   docs/                   # PRD、技术设计、融合路线图和使用说明
   web/                    # React Trace UI

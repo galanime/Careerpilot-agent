@@ -138,6 +138,14 @@ type ApplicationPlan struct {
 	SubmissionGuardrail []string `json:"submission_guardrail"`
 }
 
+type ApplicationDossier struct {
+	ReportMarkdown     string   `json:"report_markdown"`
+	CoverLetterDraft   string   `json:"cover_letter_draft"`
+	EmailDraft         string   `json:"email_draft"`
+	OpenQuestionDrafts []string `json:"open_question_drafts"`
+	ATSChecklist       []string `json:"ats_checklist"`
+}
+
 type EvalReport struct {
 	Passed              bool     `json:"passed"`
 	KeywordCoverage     float64  `json:"keyword_coverage"`

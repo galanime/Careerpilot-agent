@@ -98,6 +98,10 @@ Invoke-RestMethod -Method Post `
 - `application_materials`
 - `eval_report`
 - `application_plan`
+- `ag_report`
+- `cover_letter_draft`
+- `email_draft`
+- `ats_checklist`
 
 评估完成后，机会 JSON 会回写：
 
@@ -105,6 +109,11 @@ Invoke-RestMethod -Method Post `
 - `decision`
 - `report_run_id`
 - `status`
+
+如果通过 `/api/opportunities/<id>/evaluate` 发起评估，还会落盘：
+
+- `reports/*.md`：A-G 深度评估报告。
+- `data/applications.md`：本地投递 tracker。
 
 ## 6. 查看 Run 与产物
 
