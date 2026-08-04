@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+<rect width="960" height="470" fill="#0d1117" rx="10"/>
+<text x="32" y="44" fill="#e6edf3" font-size="21" font-weight="700">CareerPilot Agent · 架构</text>
+<text x="32" y="68" fill="#8b949e" font-size="13">Go 本地优先求职 Agent Runtime｜证据驱动生成 + 人工确认投递</text>
+<line x1="32" y1="84" x2="928" y2="84" stroke="#30363d" stroke-width="1"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#30363d"/></marker></defs>
+<rect x="32" y="104" width="200" height="96" rx="8" fill="#161b22" stroke="#6366f1" stroke-width="1.5"/>
+<text x="132.0" y="127" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">React Trace UI</text>
+<text x="132.0" y="146" fill="#8b949e" font-size="11" text-anchor="middle">Run 表单 / Trace 时间线</text>
+<text x="132.0" y="161" fill="#8b949e" font-size="11" text-anchor="middle">Artifact 分页 / Eval 面板</text>
+<rect x="262" y="104" width="200" height="96" rx="8" fill="#161b22" stroke="#6366f1" stroke-width="1.5"/>
+<text x="362.0" y="127" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">Go 标准库 HTTP + SSE</text>
+<text x="362.0" y="146" fill="#8b949e" font-size="11" text-anchor="middle">无 Web 框架</text>
+<text x="362.0" y="161" fill="#8b949e" font-size="11" text-anchor="middle">run / step / artifact 事件流</text>
+<line x1="232" y1="152" x2="260" y2="152" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="32" y="226" width="430" height="92" rx="8" fill="#161b22" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="247.0" y="249" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">Agent Runtime</text>
+<text x="247.0" y="268" fill="#8b949e" font-size="11" text-anchor="middle">plan 为确定性硬编码流程（非模型自主规划）</text>
+<text x="247.0" y="283" fill="#8b949e" font-size="11" text-anchor="middle">LLM 仅在 generate_materials 环节介入</text>
+<line x1="362" y1="200" x2="362" y2="224" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="32" y="344" width="430" height="88" rx="8" fill="#161b22" stroke="#10b981" stroke-width="1.5"/>
+<text x="247.0" y="367" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">Tool Registry</text>
+<text x="247.0" y="386" fill="#8b949e" font-size="11" text-anchor="middle">parse_jd · search_evidence · score_match · evaluate_opportunity</text>
+<text x="247.0" y="401" fill="#8b949e" font-size="11" text-anchor="middle">generate_materials · evaluate_output · build_application_plan</text>
+<line x1="247" y1="318" x2="247" y2="342" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="506" y="104" width="200" height="128" rx="8" fill="#161b22" stroke="#10b981" stroke-width="1.5"/>
+<text x="606.0" y="127" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">LLM Provider 工厂</text>
+<text x="606.0" y="146" fill="#8b949e" font-size="11" text-anchor="middle">Fake（离线可跑）</text>
+<text x="606.0" y="161" fill="#8b949e" font-size="11" text-anchor="middle">Anthropic / Claude</text>
+<text x="606.0" y="176" fill="#8b949e" font-size="11" text-anchor="middle">OpenAI-compatible</text>
+<text x="606.0" y="191" fill="#8b949e" font-size="11" text-anchor="middle">Ollama 本地模型</text>
+<rect x="736" y="104" width="192" height="128" rx="8" fill="#161b22" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="832.0" y="127" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">输出校验（2 项）</text>
+<text x="832.0" y="146" fill="#8b949e" font-size="11" text-anchor="middle">关键词覆盖率 ≥ 0.45</text>
+<text x="832.0" y="161" fill="#8b949e" font-size="11" text-anchor="middle">且必须带 evidence</text>
+<text x="832.0" y="176" fill="#8b949e" font-size="11" text-anchor="middle">无证据主张检测</text>
+<text x="832.0" y="191" fill="#8b949e" font-size="11" text-anchor="middle">不通过则不产出材料</text>
+<line x1="462" y1="152" x2="504" y2="152" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="706" y1="168" x2="734" y2="168" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="506" y="258" width="422" height="96" rx="8" fill="#161b22" stroke="#6366f1" stroke-width="1.5"/>
+<text x="717.0" y="281" fill="#e6edf3" font-size="13.5" font-weight="600" text-anchor="middle">SQLite Run Store · modernc.org/sqlite（纯 Go，无 CGO）</text>
+<text x="717.0" y="300" fill="#8b949e" font-size="11" text-anchor="middle">runs / steps / artifacts 三张表</text>
+<text x="717.0" y="315" fill="#8b949e" font-size="11" text-anchor="middle">无 CGO → 可交叉编译为单文件分发</text>
+<line x1="717" y1="232" x2="717" y2="256" stroke="#30363d" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="506" y="372" width="128.0" height="22" rx="11" fill="none" stroke="#f85149" stroke-width="1"/>
+<text x="570.0" y="387" fill="#f85149" font-size="11" text-anchor="middle">投递动作必须本人确认</text>
+<rect x="642.0" y="372" width="139.0" height="22" rx="11" fill="none" stroke="#f59e0b" stroke-width="1"/>
+<text x="711.5" y="387" fill="#f59e0b" font-size="11" text-anchor="middle">低匹配输出「先补证据」</text>
+<text x="32" y="454" fill="#8b949e" font-size="10.5">口径来源：internal/llm/factory.go · internal/tools/generate.go · internal/storage/sqlite.go</text>
+</svg>
