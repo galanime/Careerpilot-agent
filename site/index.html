@@ -1,0 +1,43 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2027届 AI 产品经理秋招投递面板</title>
+<style>
+:root{--bg:#07111f;--panel:#0c1728;--panel2:#101e32;--text:#eef6ff;--muted:#9fb0c6;--line:#23344d;--accent:#66e3ff;--green:#55e39f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0%,#153052 0,#07111f 38%),var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1380px;margin:auto;padding:24px 18px 50px}.hero{padding:24px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,rgba(102,227,255,.10),rgba(157,140,255,.08))}
+h1{margin:0 0 8px;font-size:28px}.muted{color:var(--muted)}.badges,.meta,.actions,.kw{display:flex;flex-wrap:wrap;gap:7px}.badge,.pill,.kw span{border:1px solid var(--line);border-radius:999px;padding:4px 8px;background:#0b1728}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0}.kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}.kpi b{display:block;font-size:22px}
+.notice{margin:14px 0;padding:12px 14px;background:#0c1b2c;border:1px solid #405879;border-radius:14px}
+.toolbar{position:sticky;top:0;z-index:5;padding:10px;margin:14px 0;background:rgba(7,17,31,.94);border:1px solid var(--line);border-radius:16px;display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{font:inherit}.search,select{background:#0a1525;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px}.search{flex:1;min-width:220px}
+.btn{cursor:pointer;border:1px solid var(--line);background:#14243b;color:var(--text);padding:9px 11px;border-radius:10px;text-decoration:none;display:inline-flex;align-items:center}.btn.primary{background:linear-gradient(135deg,#18a9c6,#6a62e5);border:0;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:16px}
+.head{display:flex;justify-content:space-between;gap:12px}.company{color:var(--accent);font-weight:800}.title{font-weight:800;font-size:17px}.score{min-width:68px;text-align:center;border:1px solid var(--line);border-radius:14px;padding:8px}.score b{display:block;font-size:22px;color:var(--green)}
+.sec{font-weight:800;margin-top:12px}ul{margin:5px 0 0 18px;padding:0}li{margin:3px 0}.why{margin-top:10px;padding:9px 11px;background:#0a1628;border-left:3px solid #9d8cff;border-radius:9px}.verify{font-size:12px;color:var(--muted);margin-top:9px}
+.empty{padding:18px;border:1px dashed #48617e;border-radius:14px;color:var(--muted)}.watch{margin-top:22px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.wrap{padding:12px}.hero h1{font-size:23px}}
+</style></head><body><div class="wrap">
+<section class="hero"><h1>🚀 2027届 AI 产品经理秋招投递面板</h1>
+<div class="muted">Base：北京 / 上海 / 天津 / 石家庄　·　核验日期：2026-08-18</div>
+<p>严格优先：27届正式校招 + AI产品经理 / 大模型产品 / Agent产品 / AI平台产品。</p>
+<div class="badges"><span class="badge">🔗 官方投递</span><span class="badge">🧠 JD + ATS词</span><span class="badge">💾 投递状态本地保存</span></div></section>
+<div id="kpis" class="kpis"></div>
+<div class="notice"><b>当前结论：</b>北京、上海为主战场；天津当前严格命中主要为联想 AI 产品经理；石家庄本轮没有高置信的“27届正式 AI 产品经理”岗位，不用普通产品/运营岗凑数。</div>
+<div class="toolbar"><input id="q" class="search" placeholder="搜索公司 / 岗位 / JD / 关键词…"><select id="city"><option value="">全部城市</option><option>北京</option><option>上海</option><option>天津</option><option>石家庄</option></select><select id="company"><option value="">全部公司</option></select><select id="prio"><option value="">全部优先级</option><option>S</option><option>A</option></select><button class="btn primary" onclick="openTop()">⚡ 打开 Top 5</button></div>
+<div id="empty" class="empty" style="display:none"></div><div id="grid" class="grid"></div>
+<section class="watch"><h2>👀 观察池</h2><div id="watchgrid" class="grid"></div></section>
+<div class="muted" style="margin-top:22px;font-size:12px">岗位会滚动更新/下线；投递时请以企业官网当日页面为准。匹配度仅用于你自己的投递排序，不代表录用概率。</div>
+</div>
+<script src="jobs1.js"></script><script src="jobs2.js"></script><script src="jobs3.js"></script><script src="watch.js"></script>
+<script>
+const JOBS=[...(window.JOBS_PART_1||[]),...(window.JOBS_PART_2||[]),...(window.JOBS_PART_3||[])],WATCH=window.WATCH||[],KEY='zhw_2027_ai_pm_status';
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const state=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return{}}};const save=s=>localStorage.setItem(KEY,JSON.stringify(s));
+function setStatus(id,v){let s=state();s[id]=v;save(s)}
+function renderKpis(){const n=c=>JOBS.filter(j=>j.cities.includes(c)).length;document.getElementById('kpis').innerHTML=`<div class=kpi><b>${JOBS.length}</b>严格命中岗位</div><div class=kpi><b>${n('北京')}</b>北京可投</div><div class=kpi><b>${n('上海')}</b>上海可投</div><div class=kpi><b>${n('天津')}</b>天津可投</div><div class=kpi><b>${n('石家庄')}</b>石家庄严格命中</div>`}
+function renderCompanies(){[...new Set(JOBS.map(j=>j.company))].sort().forEach(c=>{let o=document.createElement('option');o.textContent=c;company.appendChild(o)})}
+function card(j){const st=state()[j.id]||'未投递';return `<article class=card><div class=head><div><div class=company>${esc(j.company)}</div><div class=title>${esc(j.title)}</div><div class=meta>${j.cities.map(c=>`<span class=pill>📍${c}</span>`).join('')}<span class=pill>${esc(j.type)}</span><span class=pill>优先级 ${j.priority}</span></div></div><div class=score><b>${j.fit}</b>匹配度</div></div><div class=sec>JD 核心职责</div><ul>${j.jd.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class=sec>任职要求</div><ul>${j.req.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class=why><b>为什么适合你：</b>${esc(j.why)}</div><div class=kw>${j.keywords.map(k=>`<span>${esc(k)}</span>`).join('')}</div><div class=actions><a class="btn primary" target=_blank rel=noopener href="${j.url}">🚀 官方投递</a><select onchange="setStatus('${j.id}',this.value)">${['未投递','准备投递','已投递','笔试/测评','面试','暂缓'].map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select></div><div class=verify>✓ ${esc(j.verified)} · ${esc(j.date)} · ${esc(j.source)}</div></article>`}
+function filter(){const s=q.value.trim().toLowerCase(),c=city.value,co=company.value,p=prio.value;const rows=JOBS.filter(j=>{const h=[j.company,j.title,...j.cities,...j.jd,...j.req,...j.keywords,j.why].join(' ').toLowerCase();return(!s||h.includes(s))&&(!c||j.cities.includes(c))&&(!co||j.company===co)&&(!p||j.priority===p)}).sort((a,b)=>b.fit-a.fit);grid.innerHTML=rows.map(card).join('');empty.style.display=rows.length?'none':'block';empty.innerHTML=c==='石家庄'?'<b>石家庄当前 0 个严格命中。</b><br>建议优先投北京/天津，同时持续监控石家庄央国企/大厂区域岗位。':'没有符合当前筛选条件的岗位。'}
+function openTop(){JOBS.slice().sort((a,b)=>b.fit-a.fit).slice(0,5).forEach((j,i)=>setTimeout(()=>window.open(j.url,'_blank'),i*180))}
+function renderWatch(){watchgrid.innerHTML=WATCH.map(w=>`<div class=card><div class=company>${esc(w.company)}</div><div class=title>${esc(w.title)}</div><p>${esc(w.cities)}</p><p>${esc(w.reason)}</p><a class=btn target=_blank rel=noopener href="${w.url}">打开官方校招官网 ↗</a></div>`).join('')}
+[q,city,company,prio].forEach(x=>x.addEventListener('input',filter));renderKpis();renderCompanies();renderWatch();filter();
+</script></body></html>
